@@ -42,15 +42,12 @@
 			var SCREEN_WIDTH = window.innerWidth;
 			var SCREEN_HEIGHT = window.innerHeight;
 
-			var COLOR1 = 0x77bbff;
-			var COLOR2 = 0x8ec5e5;
-
 			var container,stats;
 
 			var camera, scene, glowscene;
 			var renderer, renderTarget, renderTargetGlow;
 
-			var mesh, zmesh, geometry, pointLight, pmesh, particles;
+			var mesh, zmesh, geometry, pointLight, pmesh;
 
 			var finalcomposer, glowcomposer, hblur, vblur;
 
@@ -77,19 +74,9 @@
 
 				scene = new THREE.Scene();
 				scene.add( new THREE.AmbientLight( 0xffffff ) );
-				pointLight = new THREE.PointLight( COLOR1 );
+				pointLight = new THREE.PointLight( 0xffffff );
 				pointLight.position.set( 0, 100, 0 );
 				scene.add( pointLight );
-				cameraLight = new THREE.PointLight( 0x666666 );
-				camera.add(cameraLight);
-
-
-				// GLOW SCENE
-
-				glowscene = new THREE.Scene();
-				glowscene.add( new THREE.AmbientLight( 0xffffff ) );
-				glowcamera = new THREE.PerspectiveCamera( 75, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 100000 );
-				glowcamera.position = camera.position;
 
 				// RENDERER
 					
@@ -98,7 +85,6 @@
 				});
 
 				renderer.autoClear = false;
-				renderer.sortObjects = true;
 				renderer.setSize( SCREEN_WIDTH, SCREEN_HEIGHT );
 				renderer.domElement.style.position = "relative";
 
@@ -120,16 +106,18 @@
 					callbackObj = function( geometry ) { createScene( geometry, 0, 0, 0, 0 ) };
 				loader.load( "tron/trondisk.js", callbackObj );
 
-				// PARTICLES
-				
-				particles = createParticles();
+
+				// GLOW SCENE
+
+				glowscene = new THREE.Scene();
+				glowscene.add( new THREE.AmbientLight( 0xffffff ) );
+				glowcamera = new THREE.PerspectiveCamera( 75, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 100000 );
+				glowcamera.position = camera.position;
 
 				// GLOW COMPOSER
 
 				var renderTargetParameters = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBFormat, stencilBufer: false };
 				renderTargetGlow = new THREE.WebGLRenderTarget( SCREEN_WIDTH, SCREEN_HEIGHT, renderTargetParameters );
-
-				//var saveGlowPass = new THREE.SavePass( new THREE.WebGLRenderTarget( SCREEN_WIDTH, SCREEN_HEIGHT, renderTargetParameters ) );
 				
 				var effectFXAA = new THREE.ShaderPass( THREE.ShaderExtras[ "fxaa" ] );
 				effectFXAA.uniforms[ 'resolution' ].value.set( 1 / SCREEN_WIDTH, 1 / SCREEN_HEIGHT );
@@ -137,7 +125,7 @@
 				hblur = new THREE.ShaderPass( THREE.ShaderExtras[ "horizontalBlur" ] );
 				vblur = new THREE.ShaderPass( THREE.ShaderExtras[ "verticalBlur" ] );
 
-				var bluriness = 2;
+				var bluriness = 3;
 
 				hblur.uniforms[ 'h' ].value = bluriness / SCREEN_WIDTH;
 				vblur.uniforms[ 'v' ].value = bluriness / SCREEN_HEIGHT;
@@ -147,7 +135,6 @@
 				glowcomposer = new THREE.EffectComposer( renderer, renderTargetGlow );
 
 				glowcomposer.addPass( renderModelGlow );
-				//glowcomposer.addPass( saveGlowPass );
 				glowcomposer.addPass( hblur );
 				glowcomposer.addPass( vblur );
 				glowcomposer.addPass( hblur );
@@ -158,8 +145,7 @@
 				var finalshader = {
 					uniforms: {
 						tDiffuse: { type: "t", value: 0, texture: null },
-						tGlow: { type: "t", value: 1, texture: null },
-						//tLumi: { type: "t", value: 2, texture: null }
+						tGlow: { type: "t", value: 1, texture: null }
 					},
 
 					vertexShader: [
@@ -176,7 +162,6 @@
 					fragmentShader: [
 						"uniform sampler2D tDiffuse;",
 						"uniform sampler2D tGlow;",
-						//"uniform sampler2D tLumi;",
 
 						"varying vec2 vUv;",
 
@@ -184,15 +169,13 @@
 
 							"vec4 texel = texture2D( tDiffuse, vUv );",
 							"vec4 glow = texture2D( tGlow, vUv );",
-							//"vec4 lumi = texture2D( tLumi, vUv );",
-							"gl_FragColor = texel + vec4(0.5, 0.75, 1.0, 1.0) * glow * 3.0;",
+							"gl_FragColor = texel + vec4(0.5, 0.75, 1.0, 1.0) * glow * 2.0;",
 
 						"}"
 					].join("\n")
 				};
 
 				finalshader.uniforms[ 'tGlow' ].texture = glowcomposer.renderTarget2;
-				//finalshader.uniforms[ 'tLumi' ].texture = saveGlowPass.renderTarget;
 				
 				var renderModel = new THREE.RenderPass( scene, camera );
 				var finalPass = new THREE.ShaderPass( finalshader );
@@ -220,9 +203,9 @@
 				zmesh.overdraw = true;
 				scene.add( zmesh );
 
-				var gtex = THREE.ImageUtils.loadTexture('tron/trondisk_glow.png');
+				var gtex = THREE.ImageUtils.loadTexture('tron/glow256.png');
 				gtex.needsUpdate = true;
-				//var gtex = new THREE.Texture( imageCanvas, THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping );
+				
 				var gmat = new THREE.MeshBasicMaterial( { map: gtex } );
 				var geometryClone = THREE.GeometryUtils.clone( geometry );
 				var gmesh = new THREE.Mesh(geometryClone, gmat);
@@ -230,131 +213,6 @@
 				gmesh.scale = zmesh.scale;
 				gmesh.overdraw = true;
 				glowscene.add(gmesh);
-			}
-
-			function createParticles()
-			{
-				var parent = new THREE.Object3D();
-				scene.add( parent );
-
-				// GLOW CONTAINER (used for occluder)
-				var glowparent = new THREE.Object3D();
-				glowparent.position = parent.position;
-				glowparent.rotation = parent.rotation;
-				glowparent.scale = parent.scale;
-				glowscene.add( glowparent );
-
-				/*var cube = new THREE.ParticleSystem( new THREE.PlaneGeometry( 120, 120, 60,60 ), new THREE.ParticleBasicMaterial( { color: 0x77bbff, size: 0.2 } ) );
-				cube.rotation.x = Math.PI/2;
-				cube.position.y = 40;
-				parent.add( cube );*/
-
-
-				// CUBE PARTICLES
-
-				var geometry = new THREE.Geometry();
-				var size = 100;
-				var center = size/2;
-				var step = 4;
-
-				var pixelTex = THREE.ImageUtils.loadTexture( "tron/pixel.png" );
-				pixelTex.minFilter = THREE.NearestFilter;
-				pixelTex.magFilter = THREE.NearestFilter;
-			
-				var material = new THREE.ParticleBasicMaterial( { size: 15, map: pixelTex, blending: THREE.AdditiveBlending, depthTest: true, transparent : true } );
-				material.color.setHex( COLOR1 );
-
-				for ( i = 0; i < size; i += step ) {
-					for( j = 0; j < size; j += step ) {
-
-						//vector = new THREE.Vector3( i-center, Math.random() * size, j-center );
-						vector = new THREE.Vector3( 
-							Math.cos(Math.random()*360)*size/2, 
-							Math.random() * size, 
-							Math.cos(Math.random()*360)*size/2 );
-						geometry.vertices.push( new THREE.Vertex( vector ) );
-					
-					}
-				}
-
-				var cube = new THREE.ParticleSystem( geometry, 
-					//new THREE.ParticleBasicMaterial({size: 0.4, color: COLOR1})
-					material 
-				);
-				//cube.rotation.x = Math.PI/2;
-				cube.position.y = 30;
-				cube.dynamic = true;
-				cube.sortParticles = true;
-				parent.add( cube );
-
-				// GLYPH (BIG ONE)
-
-				var glyph = new THREE.Mesh( 
-					new THREE.IcosahedronGeometry(5),
-					new THREE.MeshBasicMaterial({
-						color: COLOR1,
-						opacity: 1,
-						wireframe: true,
-						wireframeLinewidth: 4
-					})
-				);
-				glyph.position.y = size/2 + 30;
-				glyph.scale.x = glyph.scale.y = glyph.scale.z = 50;
-				parent.add( glyph );
-
-				// GLYPH2 (CORE)
-				var glyph2subdiv = 10;
-				var glyph2 = new THREE.Mesh( 
-					new THREE.IcosahedronGeometry(glyph2subdiv),
-					new THREE.MeshPhongMaterial({
-						color: COLOR1,
-						specular: COLOR1,
-						shading: THREE.FlatShading,
-						opacity: 0.9,
-						ambient: 0x202830
-					})
-				);
-				glyph2.position.y = size/2 + 30;
-				glyph2.scale.x = glyph2.scale.y = glyph2.scale.z = 35;
-				parent.add( glyph2 );
-				
-
-				// GLYPHE2 WIREFRAME
-				var glyph2wf = new THREE.Mesh( 
-					new THREE.IcosahedronGeometry(glyph2subdiv),
-					new THREE.MeshBasicMaterial({
-						color: COLOR2,
-						wireframe: true,
-						opacity: 1,
-						wireframeLinewidth: 4
-					})
-				);
-				glyph2wf.position = glyph2.position;
-				glyph2wf.rotation = glyph2.rotation;
-				glyph2wf.scale.x = glyph2wf.scale.y = glyph2wf.scale.z = glyph2.scale.x + 0.1;
-				parent.add( glyph2wf );
-
-				// GLYPHE2 GLOW OCCLUDER
-				var glyph2oc = new THREE.Mesh( 
-					new THREE.IcosahedronGeometry(glyph2subdiv),
-					new THREE.MeshBasicMaterial({
-						color: 0x000000,
-						shading: THREE.FlatShading
-					})
-				);
-				glyph2oc.position = glyph2.position;
-				glyph2oc.rotation = glyph2.rotation;
-				glyph2oc.scale.x = glyph2oc.scale.y = glyph2oc.scale.z = glyph2.scale.x;
-				glowparent.add( glyph2oc );
-
-				return {
-					container: parent,
-					system: cube,
-					vertices: geometry.vertices,
-					size: size,
-					glyph: glyph,
-					glyph2: glyph2
-				};
 			}
 
 			function onDocumentMouseMove(event) {
@@ -379,27 +237,12 @@
 
 			function render() {
 				t += .01;
-
-				// PARTICLES
-				for( i = 0; i < particles.vertices.length; i++ )
-				{
-					var p = particles.vertices[i];
-					p.position.y += 0.04;
-					if( p.position.y > particles.size)
-						p.position.y = 0;
-				}
-				//particles.container.rotation.y += 0.002;
-				particles.glyph.rotation.x += 0.004;
-				particles.glyph.rotation.z -= 0.003;
-				particles.glyph2.rotation.x -= 0.004;
-				particles.glyph2.rotation.z += 0.003;
-
 				camera.position.x += ( mouseX/2 - camera.position.x ) * .05;
-				camera.position.y += ( - mouseY/2 - camera.position.y ) * .05 + 5;
+				camera.position.y += ( - mouseY/2 - camera.position.y ) * .05;
 
 				camera.lookAt( scene.position );
 				glowcamera.lookAt( scene.position );
-				//pointLight.position.set( 0, Math.cos(t)*200, 0 );
+				pointLight.position.set( 0, Math.cos(t)*200, 0 );
 
 				glowcomposer.render( 0.1 );
 				finalcomposer.render( 0.1 );
