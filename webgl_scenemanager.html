@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>THREE.RenderManager example</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background:#000;
+				padding:0;
+				margin:0;
+				overflow:hidden;
+				font-family:georgia;
+				text-align:center;
+				color: #ccc;
+			}
+			h1 {color: #ccc; }
+			a { color:skyblue }
+			canvas { pointer-events:none; z-index:10; }
+			#d {
+				position: absolute;
+				z-index: 99999;
+				top: 0;
+				right: 20px;
+				text-align: right;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="d">
+			<h1>THREE.RenderManager</h1>
+			<p>A Three.js extension by <a href="http://bkcore.com">Thibaut Despoulain</a>.</p>
+			<p><strong>Setup to render: </strong><button onclick="renderManager.setCurrent('FirstSetup');">FirstSetup</button> <button onclick="renderManager.setCurrent('SecondSetup');">SecondSetup</button> <button  onclick="renderManager.setCurrent('ThirdSetup');">ThirdSetup</button> 
+		</div>
+
+		<script src="js/Three.js"></script>
+		<script src="js/RenderManager.js"></script>
+
+		<script src="js/Detector.js"></script>
+		<script src="js/Stats.js"></script>
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container, stats;
+
+			var renderer, renderManager;
+
+			init();
+			animate();
+
+			function init() {
+
+				var light, object, materials, scene, camera;
+
+				// Define global material
+				materials = [
+					new THREE.MeshPhongMaterial( { ambient: 0x444444, color: 0x66ccff, specular: 0xffffff, shading: THREE.SmoothShading } ),
+					new THREE.MeshBasicMaterial( { color: 0xffffff, wireframe: true, transparent: true, opacity: 0.1 } )
+				];
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				container.appendChild( renderer.domElement );
+
+//>>>>>>>>>>>>>>// RENDER MANAGER
+				
+				renderManager = new THREE.RenderManager(renderer);
+
+				// SCENE 1
+
+				scene = new THREE.Scene();
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
+				camera.position.y = 200;
+				scene.add( camera );
+
+				scene.add( new THREE.AmbientLight( 0xffffff) );
+
+				light = new THREE.PointLight( 0xffffff );
+				light.position.set( 200, 200, 200 );
+				scene.add( light );
+
+				object = THREE.SceneUtils.createMultiMaterialObject( new THREE.CubeGeometry( 100, 100, 100, 4, 4, 4 ), materials );
+				scene.add( object );
+
+//>>>>>>>>>>>>>>// Adds a new render setup called 'FirstSetup'
+				// With scene as main scene
+				// With camera as main camera
+				// With the following method as render loop.
+				// With a timer object attached
+				renderManager.add('FirstSetup', scene, camera, function(delta, renderer)
+				{
+					this.objects.timer += delta;
+
+					this.camera.position.x = Math.cos( this.objects.timer ) * 200;
+					this.camera.position.z = Math.sin( this.objects.timer ) * 200;
+					this.camera.lookAt( this.scene.position );
+
+					renderer.render(this.scene, this.camera);
+				},
+				{
+					timer: 0
+				});
+
+				// SCENE 2
+
+				scene = new THREE.Scene();
+
+				camera = new THREE.PerspectiveCamera( 80, window.innerWidth / window.innerHeight, 1, 2000 );
+				camera.position.z = 200;
+				camera.position.y = 100;
+				camera.add( new THREE.PointLight( 0xffffff ) );
+				scene.add( camera );
+
+				scene.add( new THREE.AmbientLight( 0xffffff) );
+
+				object = THREE.SceneUtils.createMultiMaterialObject( new THREE.TorusKnotGeometry( 50, 10, 50, 20 ), materials );
+				scene.add( object );
+
+				renderManager.add('SecondSetup', scene, camera, function(delta, renderer)
+				{
+					this.objects.timer += delta;
+					this.objects.torus.rotation.z = Math.PI * Math.cos(this.objects.timer);
+
+					this.camera.position.x = Math.sin( this.objects.timer ) * 200;
+					this.camera.lookAt( this.scene.position );
+
+					renderer.render(this.scene, this.camera);
+				},
+				{
+					timer: 0,
+					torus: object
+				});
+
+				// SCENE 3
+
+				scene = new THREE.Scene();
+
+				scene.add( new THREE.AmbientLight( 0xffffff) );
+
+				object = THREE.SceneUtils.createMultiMaterialObject( new THREE.IcosahedronGeometry( 75, 1 ), materials );
+				scene.add( object );
+
+				// No render method provided means that the default Renderer method will be used.
+				renderManager.add('ThirdSetup', scene, camera);
+
+				// STATS
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				container.appendChild( stats.domElement );
+
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+//>>>>>>>>>>>>>>// No need for a separate render() method
+				// just call the renderCurrent() method of the RenderManager.
+				// Time delta will be automatically computed internally.
+				renderManager.renderCurrent();
+
+				stats.update();
+			}
+
+		</script>
+
+	</body>
+</html>
