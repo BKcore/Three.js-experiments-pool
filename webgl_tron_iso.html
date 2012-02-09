@@ -239,10 +239,9 @@
 
 				var gtex = THREE.ImageUtils.loadTexture('tron/trondisk_glow.png');
 				gtex.needsUpdate = true;
-				//var gtex = new THREE.Texture( imageCanvas, THREE.UVMapping, THREE.RepeatWrapping, THREE.RepeatWrapping );
-				var gmat = new THREE.MeshBasicMaterial( { map: gtex } );
-				var geometryClone = THREE.GeometryUtils.clone( geometry );
-				var gmesh = new THREE.Mesh(geometryClone, gmat);
+
+				var gmat = new THREE.MeshPhongMaterial( { map: gtex, ambient: 0xffffff, color: 0x000000 } );
+				var gmesh = new THREE.Mesh(geometry, gmat);
 				gmesh.position = zmesh.position;
 				gmesh.scale = zmesh.scale;
 				gmesh.overdraw = true;
@@ -353,10 +352,13 @@
 
 				// GLYPHE2 GLOW OCCLUDER
 				var glyph2oc = new THREE.Mesh( 
-					THREE.GeometryUtils.clone( glyph2geom ),
-					new THREE.MeshBasicMaterial({
+					glyph2geom,
+					new THREE.MeshPhongMaterial({
 						color: 0x000000,
-						shading: THREE.FlatShading
+						specular: 0x000000,
+						shading: THREE.FlatShading,
+						opacity: 0.9,
+						ambient: 0x000000
 					})
 				);
 				glyph2oc.position = glyph2.position;
